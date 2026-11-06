@@ -3,3 +3,5 @@ __pycache__/
 .venv/
 *.pyc
 .DS_Store
+data/agent_a/
+data/agent_b/
