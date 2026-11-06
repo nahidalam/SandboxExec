@@ -21,18 +21,7 @@ class BaseProvider:
         raise NotImplementedError
 
 
-class MockProvider(BaseProvider):
-    def get_initial_request(self):
-        return 'Customer-level records and revenue data.'
-
-    def get_replanned_request(self, denial_feedback):
-        return 'Provide revenue aggregated by customer segment for the current report.'
-
-    def get_scoped_response(self, approved_request):
-        return 'I can provide revenue aggregated by customer segment for this report.'
-
-    def get_agent_a_code(self):
-        return '''
+AGENT_A_CODE = '''
 import csv
 import json
 from pathlib import Path
@@ -48,8 +37,7 @@ Path('/output/revenue_by_segment.json').write_text(json.dumps(output, indent=2))
 print(json.dumps(output))
 '''
 
-    def get_report_code(self):
-        return '''
+REPORT_CODE = '''
 import html
 import json
 from pathlib import Path
@@ -62,7 +50,7 @@ rows = ''.join(
     for key, value in data.items()
 )
 report = f"""<!doctype html>
-<html><head><meta charset=\"utf-8\"><title>Revenue Report</title>
+<html><head><meta charset="utf-8"><title>Revenue Report</title>
 <style>body {{ font-family: Arial, sans-serif; margin: 2rem; }} table {{ border-collapse: collapse; width: 320px; }} th, td {{ border: 1px solid #ccc; padding: 0.6rem; text-align: left; }}</style>
 </head><body><h1>Revenue Report</h1><table><thead><tr><th>Segment</th><th>Revenue</th></tr></thead><tbody>{rows}</tbody></table></body></html>"""
 Path('/output/report.html').write_text(report)
@@ -70,7 +58,24 @@ print('report generated')
 '''
 
 
-class VultrProvider(MockProvider):
+class MockProvider(BaseProvider):
+    def get_initial_request(self):
+        return 'Customer-level records and revenue data.'
+
+    def get_replanned_request(self, denial_feedback):
+        return 'Provide revenue aggregated by customer segment for the current report.'
+
+    def get_scoped_response(self, approved_request):
+        return 'I can provide revenue aggregated by customer segment for this report.'
+
+    def get_agent_a_code(self):
+        return AGENT_A_CODE
+
+    def get_report_code(self):
+        return REPORT_CODE
+
+
+class VultrProvider(BaseProvider):
     def __init__(self):
         self.base_url = os.getenv('VULTR_INFERENCE_BASE_URL', '').strip().rstrip('/')
         self.api_key = os.getenv('VULTR_INFERENCE_API_KEY', '').strip()
@@ -116,6 +121,12 @@ class VultrProvider(MockProvider):
 
     def get_scoped_response(self, approved_request):
         return self._complete('You are Agent A. Respond to this approved request with a one-sentence commitment limited to the aggregate revenue_by_segment.json artifact for the current revenue report. Request: ' + approved_request)
+
+    def get_agent_a_code(self):
+        return AGENT_A_CODE
+
+    def get_report_code(self):
+        return REPORT_CODE
 
 
 def get_provider():
