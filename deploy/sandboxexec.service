@@ -1,0 +1,17 @@
+[Unit]
+Description=SandboxExec demo API
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/SandboxExec
+EnvironmentFile=/etc/sandboxexec/sandboxexec.env
+ExecStart=/root/SandboxExec/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

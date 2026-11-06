@@ -3,286 +3,107 @@ const agentAEl = document.getElementById('agent-a-panel');
 const gatewayEl = document.getElementById('gateway-panel');
 const agentBEl = document.getElementById('agent-b-panel');
 const runButton = document.getElementById('run-demo');
+const steps = ['REQUEST', 'DENIED', 'REPLAN', 'AGREEMENT', 'EXECUTE', 'VERIFY', 'COMPLETE'];
 
-const workflowSteps = ['REQUEST', 'DENIED', 'REPLAN', 'AGREEMENT', 'EXECUTE', 'VERIFY', 'COMPLETE'];
-
-function evidenceBlock(label, payload) {
-  return `
-    <div class="evidence" hidden>
-      <div class="card-label">${label}</div>
-      <pre>${JSON.stringify(payload, null, 2)}</pre>
-    </div>
-  `;
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
 }
 
-function renderTimeline(activeIndex = -1) {
-  timelineEl.innerHTML = workflowSteps
-    .map((step, index) => {
-      const classes = ['step'];
-      if (index <= activeIndex) classes.push('active');
-      if (index <= activeIndex && step !== 'DENIED') classes.push('success');
-      if (step === 'DENIED' && index <= activeIndex) classes.push('security');
-      return `<span class="${classes.join(' ')}" data-step="${step}">${step}</span>`;
-    })
-    .join('');
+function evidence(label, payload) {
+  return `<button class="ghost evidence-toggle">View evidence</button>
+    <div class="evidence" hidden><div class="card-label">${esc(label)}</div><pre>${esc(JSON.stringify(payload, null, 2))}</pre></div>`;
 }
 
-function animateTimeline() {
-  renderTimeline(-1);
-  workflowSteps.forEach((step, index) => {
-    setTimeout(() => {
-      renderTimeline(index);
-    }, 350 * (index + 1));
-  });
+function card(label, body, detailLabel, detail) {
+  return `<div class="card"><div class="card-head"><div class="card-label">${esc(label)}</div></div>${body}${detailLabel ? evidence(detailLabel, detail) : ''}</div>`;
 }
 
-function renderEvidenceButton(id, label = 'View evidence') {
-  return `<button class="ghost evidence-toggle" data-target="${id}">${label}</button>`;
+function renderTimeline(timeline = []) {
+  const visible = [...steps];
+  if (timeline.includes('FAILED')) visible.push('FAILED');
+  timelineEl.innerHTML = visible.map(step => {
+    const active = timeline.includes(step);
+    const classes = ['step'];
+    if (active) classes.push('active', step === 'DENIED' || step === 'FAILED' ? 'security' : 'success');
+    return `<span class="${classes.join(' ')}" data-step="${step}">${step}</span>`;
+  }).join('');
 }
 
-function toggleEvidence(event) {
-  const button = event.target.closest('.evidence-toggle');
-  if (!button) return;
-  const target = button.parentElement.querySelector('.evidence');
-  if (!target) return;
-  const isHidden = target.hasAttribute('hidden');
-  target.toggleAttribute('hidden', !isHidden);
-  button.textContent = isHidden ? 'Hide evidence' : 'View evidence';
+function artifactRows(artifact) {
+  if (!artifact) return '';
+  const labels = {enterprise: 'Enterprise', mid_market: 'Mid-market', small_business: 'Small business'};
+  return `<ul class="list">${Object.entries(artifact).map(([key, value]) =>
+    `<li>${esc(labels[key] || key)}: $${Number(value).toLocaleString()}</li>`).join('')}</ul>`;
 }
 
-function renderAgreementCard(data) {
-  const agreement = data.agreement;
-  return `
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Agreement</div>
-        <span class="status approved">Approved</span>
-      </div>
-      <div class="big">AGREEMENT APPROVED</div>
-      <ul class="list">
-        <li>Resource: ${agreement.resource.replace('_', ' ')}</li>
-        <li>Access: ${agreement.operation}</li>
-        <li>Purpose: ${agreement.purpose.replace('_', ' ')}</li>
-        <li>Scope: ${agreement.scope.replace('_', ' ')}</li>
-      </ul>
-      ${renderEvidenceButton('gateway-agreement')}
-      ${evidenceBlock('Agreement JSON', agreement)}
-    </div>
-  `;
-}
-
-function renderGateway(data) {
-  const denial = data.denial;
-  const verification = data.verification;
-
-  gatewayEl.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Original Request</div>
-      </div>
-      <div class="big">Agent B requests customer-level revenue records</div>
-      ${evidenceBlock('Original request', data.request.original)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Security decision</div>
-      </div>
-      <div class="status denied">Denied</div>
-      <div class="big">Customer-level records are restricted.</div>
-      ${evidenceBlock('Structured denial', denial)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Structured Feedback</div>
-      </div>
-      <div class="big">Available alternative</div>
-      <div class="quote">Revenue aggregated by customer segment</div>
-      ${evidenceBlock('Structured feedback', denial)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Replan</div>
-      </div>
-      <div class="big">Agent B adapts its request</div>
-      <div class="quote">“Provide revenue aggregated by customer segment for this report.”</div>
-      ${evidenceBlock('Replanned request', data.request.replanned)}
-    </div>
-
-    ${renderAgreementCard(data)}
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Verification</div>
-      </div>
-      <div class="status verified">Verified</div>
-      <div class="big">ARTIFACT VERIFIED</div>
-      <ul class="list">
-        <li>Valid format ✓</li>
-        <li>Aggregate data only ✓</li>
-        <li>No customer identifiers ✓</li>
-        <li>Agreement satisfied ✓</li>
-      </ul>
-      ${renderEvidenceButton('gateway-verification')}
-      ${evidenceBlock('Verification result', verification)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Artifact Release</div>
-      </div>
-      <div class="big">Verified artifact released to Agent B</div>
-      <div class="muted">customers.csv remained inside Agent A's sandbox</div>
-      ${renderEvidenceButton('gateway-release')}
-      ${evidenceBlock('Release metadata', data.security)}
-    </div>
-  `;
-
-  gatewayEl.querySelectorAll('.evidence-toggle').forEach((button) => {
-    button.addEventListener('click', toggleEvidence);
-  });
+function executionCard(label, result) {
+  if (!result) return '';
+  const passed = result.exit_code === 0;
+  return card(label,
+    `<div class="big">${passed ? 'Execution succeeded' : 'Execution failed'}</div>
+     <div class="badges"><span class="badge">${esc(result.docker_image)}</span>
+     <span class="badge">Exit ${esc(result.exit_code)}</span>
+     <span class="badge">${esc(result.duration_seconds)}s</span></div>`,
+    `${label} evidence`, result);
 }
 
 function renderAgentA(data) {
-  const artifact = data.artifact;
-  agentAEl.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Private Dataset</div>
-      </div>
-      <div class="big">9 customer records</div>
-      <div class="muted">customers.csv · private to Agent A</div>
-      ${evidenceBlock('Private dataset metadata', { filename: 'customers.csv', rows: 9 })}
-    </div>
+  let html = card('Private Dataset', '<div class="big">customers.csv</div><div class="muted">Private to Agent A</div>');
+  if (data.request.replanned) html += card('Approved Request', `<div class="big">${esc(data.request.replanned)}</div>`);
+  html += executionCard('Sandbox Execution', data.execution.agent_a);
+  if (data.artifact) html += card('Generated Artifact', `<div class="big">Revenue by segment</div>${artifactRows(data.artifact)}`, 'Artifact payload', data.artifact);
+  agentAEl.innerHTML = html;
+}
 
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Approved Request</div>
-      </div>
-      <div class="big">Generate revenue by customer segment</div>
-      ${evidenceBlock('Approved request', data.request.replanned)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Sandbox Execution</div>
-      </div>
-      <div class="big">Analysis completed successfully</div>
-      <div class="badges">
-        <span class="badge">Docker</span>
-        <span class="badge">Exit 0</span>
-        <span class="badge">1.2s</span>
-      </div>
-      ${renderEvidenceButton('agent-a-execution')}
-      ${evidenceBlock('Agent A execution', data.execution.agent_a)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Generated Artifact</div>
-      </div>
-      <div class="big">Revenue by segment</div>
-      <ul class="list">
-        <li>Enterprise: $620,000</li>
-        <li>Mid-market: $410,000</li>
-        <li>Small business: $170,000</li>
-      </ul>
-      ${renderEvidenceButton('agent-a-artifact')}
-      ${evidenceBlock('Artifact payload', artifact)}
-    </div>
-
-    <script>
-      // no-op placeholder to keep browser parse clean
-    </script>
-  `;
-
-  agentAEl.querySelectorAll('.evidence-toggle').forEach((button) => {
-    button.addEventListener('click', toggleEvidence);
-  });
+function renderGateway(data) {
+  let html = '';
+  if (data.request.original) html += card('Original Request', `<div class="big">${esc(data.request.original)}</div>`, 'Original request', data.request.original);
+  if (data.denial) html += card('Security decision', `<div class="status ${data.denial.status === 'denied' ? 'denied' : ''}">${esc(data.denial.status)}</div><div class="big">${esc(data.denial.reason)}</div>`, 'Structured feedback', data.denial);
+  if (data.request.replanned) html += card('Replan', `<div class="big">${esc(data.request.replanned)}</div>`, 'Replan policy', data.replan_policy);
+  if (data.agreement) html += card('Agreement', `<div class="status ${data.agreement_validation?.valid ? 'approved' : 'denied'}">${data.agreement_validation?.valid ? 'Approved' : 'Invalid'}</div><ul class="list"><li>Resource: ${esc(data.agreement.resource)}</li><li>Access: ${esc(data.agreement.operation)}</li><li>Purpose: ${esc(data.agreement.purpose)}</li><li>Scope: ${esc(data.agreement.scope)}</li></ul>`, 'Agreement and scoped response', {agreement: data.agreement, validation: data.agreement_validation, agent_a_response: data.scoped_response});
+  if (data.verification) html += card('Verification', `<div class="status ${data.verification.verified ? 'verified' : 'denied'}">${data.verification.verified ? 'Verified' : 'Failed'}</div><div class="big">${data.verification.verified ? 'ARTIFACT VERIFIED' : 'ARTIFACT REJECTED'}</div>`, 'Verification result', data.verification);
+  if (data.security.artifact_release) html += card('Artifact Release', `<div class="big">${data.security.agent_b_received_only_approved_artifact ? 'Verified artifact released to Agent B' : 'Artifact access failed'}</div><div class="muted">customers.csv — ${esc(data.execution.agent_b?.customers_csv || 'unknown')}<br>revenue_by_segment.json — ${esc(data.execution.agent_b?.revenue_by_segment_json || 'unknown')}</div>`, 'Release and mount evidence', {security: data.security, mounted_inputs: data.execution.agent_b?.mounted_inputs});
+  if (data.failure) html += card('Workflow Failed', `<div class="status denied">Failed</div><div class="big">${esc(data.failure)}</div>`, 'Audit trail', data.audit);
+  gatewayEl.innerHTML = html;
 }
 
 function renderAgentB(data) {
-  agentBEl.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Original Request</div>
-      </div>
-      <div class="big">Customer-level records and revenue data</div>
-      ${evidenceBlock('Original request', data.request.original)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Replan</div>
-      </div>
-      <div class="big">Revenue aggregated by customer segment</div>
-      <div class="muted">Adapted from policy feedback</div>
-      ${evidenceBlock('Replanned request', data.request.replanned)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Received Artifact</div>
-      </div>
-      <ul class="list">
-        <li>Enterprise: $620,000</li>
-        <li>Mid-market: $410,000</li>
-        <li>Small business: $170,000</li>
-      </ul>
-      ${evidenceBlock('Received artifact', data.artifact)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Report Execution</div>
-      </div>
-      <div class="big">Report generated successfully</div>
-      <div class="badges">
-        <span class="badge">Docker</span>
-        <span class="badge">Exit 0</span>
-        <span class="badge">1.2s</span>
-      </div>
-      ${renderEvidenceButton('agent-b-execution')}
-      ${evidenceBlock('Agent B execution', data.execution.agent_b)}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-label">Completed Report</div>
-      </div>
-      <div class="big">Revenue report completed</div>
-      <button class="secondary" id="view-report">View Report</button>
-      ${evidenceBlock('Final report status', { status: data.status, final_report_generated: data.execution.final_report_generated })}
-    </div>
-  `;
-
-  agentBEl.querySelectorAll('.evidence-toggle').forEach((button) => {
-    button.addEventListener('click', toggleEvidence);
-  });
-
-  const reportButton = document.getElementById('view-report');
-  if (reportButton) {
-    reportButton.addEventListener('click', () => {
-      window.open('/api/report', '_blank');
-    });
+  let html = '';
+  if (data.request.original) html += card('Original Request', `<div class="big">${esc(data.request.original)}</div>`);
+  if (data.request.replanned) html += card('Replan', `<div class="big">${esc(data.request.replanned)}</div>`);
+  if (data.execution.agent_b && data.artifact) html += card('Received Artifact', artifactRows(data.artifact), 'Received artifact', data.artifact);
+  html += executionCard('Report Execution', data.execution.agent_b);
+  if (data.status === 'complete' && data.execution.final_report_generated) {
+    html += card('Completed Report', '<div class="big">Revenue report completed</div><button class="secondary" id="view-report">View Report</button>', 'Final report status', {status: data.status, final_report_generated: true});
   }
+  agentBEl.innerHTML = html;
+  document.getElementById('view-report')?.addEventListener('click', () => window.open('/api/report', '_blank'));
 }
+
+document.addEventListener('click', event => {
+  const button = event.target.closest('.evidence-toggle');
+  if (!button) return;
+  const target = button.nextElementSibling;
+  const show = target.hasAttribute('hidden');
+  target.toggleAttribute('hidden', !show);
+  button.textContent = show ? 'Hide evidence' : 'View evidence';
+});
 
 async function runDemo() {
   runButton.disabled = true;
   runButton.textContent = 'Running...';
-  animateTimeline();
-
+  renderTimeline();
   try {
     const response = await fetch('/api/demo');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-
     renderAgentA(data);
     renderGateway(data);
     renderAgentB(data);
-    renderTimeline(workflowSteps.length - 1);
+    renderTimeline(data.audit?.timeline || []);
+  } catch (error) {
+    gatewayEl.innerHTML = card('Workflow Failed', `<div class="status denied">Failed</div><div class="big">${esc(error.message)}</div>`);
+    renderTimeline(['FAILED']);
   } finally {
     runButton.disabled = false;
     runButton.textContent = 'Run Demo';
@@ -290,5 +111,5 @@ async function runDemo() {
 }
 
 runButton.addEventListener('click', runDemo);
-renderTimeline(-1);
+renderTimeline();
 runDemo();
