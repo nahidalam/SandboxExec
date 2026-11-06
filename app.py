@@ -87,12 +87,22 @@ def _run_demo(provider):
         if denial['status'] != 'denied':
             return fail('initial_request_was_not_denied')
 
-        replanned_request = provider.get_replanned_request(denial)
-        result['inference']['completed_steps'].append('replanned_request')
+        feedback = denial
+        replan_attempts = []
+        for _ in range(3):
+            replanned_request = provider.get_replanned_request(feedback)
+            result['inference']['completed_steps'].append('replanned_request')
+            replan_policy = evaluate_policy(replanned_request)
+            replan_attempts.append({'text': replanned_request, 'policy': replan_policy})
+            if replan_policy['status'] == 'approved' and all(
+                word in replanned_request.lower() for word in ('revenue', 'segment')
+            ):
+                break
+            feedback = replan_policy
         result['request']['replanned'] = replanned_request
-        replan_policy = evaluate_policy(replanned_request)
         result['replan_policy'] = replan_policy
-        audit.log('REPLAN', {'requester': 'agent_b', 'text': replanned_request, 'policy': replan_policy})
+        audit.log('REPLAN', {'requester': 'agent_b', 'text': replanned_request,
+                             'policy': replan_policy, 'attempts': replan_attempts})
         if replan_policy['status'] != 'approved' or not all(
             word in replanned_request.lower() for word in ('revenue', 'segment')
         ):

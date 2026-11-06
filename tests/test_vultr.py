@@ -90,3 +90,27 @@ def test_provider_failure_is_reported_without_mock_fallback(monkeypatch):
     assert result['inference']['completed_steps'] == []
     assert result['execution']['agent_a'] is None
     assert result['audit']['timeline'] == ['FAILED']
+
+
+def test_denied_replan_gets_structured_feedback_and_retries():
+    from app import run_demo
+    from inference import MockProvider
+
+    class RetryProvider(MockProvider):
+        def __init__(self):
+            self.feedback = []
+
+        def get_replanned_request(self, feedback):
+            self.feedback.append(feedback)
+            if len(self.feedback) == 1:
+                return 'Provide revenue by segment, excluding customer-level records.'
+            return 'Provide aggregated revenue by segment for this report.'
+
+    provider = RetryProvider()
+    result = run_demo(provider)
+    assert result['status'] == 'complete'
+    assert len(provider.feedback) == 2
+    assert provider.feedback[0]['reason'] == 'customer_level_records_restricted'
+    assert provider.feedback[1]['status'] == 'denied'
+    assert len(next(entry for entry in result['audit']['entries'] if entry['label'] == 'REPLAN')['payload']['attempts']) == 2
+    assert result['audit']['timeline'] == ['REQUEST', 'DENIED', 'REPLAN', 'AGREEMENT', 'EXECUTE', 'VERIFY', 'COMPLETE']

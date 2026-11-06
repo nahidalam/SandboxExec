@@ -125,7 +125,7 @@ class VultrProvider(BaseProvider):
         return self._complete('You are Agent B preparing a revenue report. Make an initial request to Agent A for customer-level records and revenue data. Include the exact phrase customer-level records. This request is expected to be denied by policy.')
 
     def get_replanned_request(self, denial_feedback):
-        return self._complete('Your initial request was denied. Structured policy feedback: ' + json.dumps(denial_feedback, sort_keys=True) + '. Replan with a request for revenue aggregated by customer segment for the current report. Do not request customer-level data or identifiers.')
+        return self._complete('Policy feedback: ' + json.dumps(denial_feedback, sort_keys=True) + '. Write one concise request for the allowed revenue aggregate by segment for the current report. Mention only the aggregate and the report purpose. Omit the denied source and all exclusion clauses; referring to a denied source causes another denial.')
 
     def get_scoped_response(self, approved_request):
         return self._complete('You are Agent A. Respond to this approved request with a one-sentence commitment limited to the aggregate revenue_by_segment.json artifact for the current revenue report. Request: ' + approved_request)
