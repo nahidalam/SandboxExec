@@ -1,0 +1,10 @@
+customer_id,segment,revenue
+c1,enterprise,250000
+c2,enterprise,180000
+c3,enterprise,190000
+c4,mid_market,110000
+c5,mid_market,120000
+c6,mid_market,180000
+c7,small_business,50000
+c8,small_business,60000
+c9,small_business,60000

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SandboxExec</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div>
+          <h1>SandboxExec</h1>
+          <p>Secure multi-agent execution with structured feedback and verified artifacts.</p>
+        </div>
+        <button id="run-demo">Run Demo</button>
+      </header>
+
+      <div id="timeline" class="timeline"></div>
+
+      <main class="grid">
+        <section class="panel">
+          <h2>Agent A</h2>
+          <div id="agent-a-panel" class="content"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Security / Agreement Gateway</h2>
+          <div id="gateway-panel" class="content"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Agent B</h2>
+          <div id="agent-b-panel" class="content"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
