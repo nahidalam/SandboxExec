@@ -110,6 +110,12 @@ async function runDemo() {
   }
 }
 
+function renderIdle() {
+  agentAEl.innerHTML = card('Status', '<div class="big">Ready</div><div class="muted">Private data owner</div>');
+  gatewayEl.innerHTML = card('Status', '<div class="big">Ready</div><div class="muted">Waiting for agent request</div>');
+  agentBEl.innerHTML = card('Status', '<div class="big">Ready</div><div class="muted">Report agent</div>');
+}
+
 runButton.addEventListener('click', runDemo);
 renderTimeline();
-runDemo();
+renderIdle();
