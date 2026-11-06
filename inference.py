@@ -56,8 +56,13 @@ outfile = Path('/workspace/report.html')
 with infile.open() as f:
     data = json.load(f)
 
+label_map = {
+    'enterprise': 'Enterprise',
+    'mid_market': 'Mid-market',
+    'small_business': 'Small business',
+}
 rows = "\\n".join(
-    f"<tr><td>{key}</td><td>${value:,.0f}</td></tr>" for key, value in data.items()
+    f"<tr><td>{label_map.get(key, key)}</td><td>${value:,.0f}</td></tr>" for key, value in data.items()
 )
 html = f"""<!doctype html>
 <html>
