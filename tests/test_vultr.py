@@ -48,7 +48,7 @@ def test_vultr_calls_real_endpoint_with_structured_feedback(monkeypatch):
     for request, timeout in calls:
         assert request.full_url == 'https://api.vultrinference.com/v1/chat/completions'
         assert request.get_header('Authorization') == 'Bearer test-secret'
-        assert timeout == 30
+        assert timeout == 60
         body = json.loads(request.data)
         assert body['model'] == 'test-model'
     assert 'customer_level_records_restricted' in json.loads(calls[1][0].data)['messages'][1]['content']
@@ -73,3 +73,20 @@ def test_vultr_http_failure_does_not_expose_key(monkeypatch):
     with pytest.raises(RuntimeError, match='HTTP 401') as exc:
         inference.VultrProvider().get_initial_request()
     assert 'test-secret' not in str(exc.value)
+
+
+def test_provider_failure_is_reported_without_mock_fallback(monkeypatch):
+    from app import run_demo
+    monkeypatch.setenv('VULTR_INFERENCE_BASE_URL', 'https://api.vultrinference.com/v1')
+    monkeypatch.setenv('VULTR_INFERENCE_API_KEY', 'test-secret')
+    monkeypatch.setenv('VULTR_MODEL', 'test-model')
+    def fail(request, timeout):
+        raise HTTPError(request.full_url, 401, 'unauthorized', {}, None)
+    monkeypatch.setattr(inference, 'urlopen', fail)
+    result = run_demo(inference.VultrProvider())
+    assert result['status'] == 'failed'
+    assert result['failure'] == 'Vultr inference HTTP 401'
+    assert result['inference']['provider'] == 'vultr'
+    assert result['inference']['completed_steps'] == []
+    assert result['execution']['agent_a'] is None
+    assert result['audit']['timeline'] == ['FAILED']

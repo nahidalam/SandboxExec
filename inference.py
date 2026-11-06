@@ -4,6 +4,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
+class InferenceError(RuntimeError):
+    pass
+
+
 class BaseProvider:
     def get_initial_request(self):
         raise NotImplementedError
@@ -59,6 +63,7 @@ print('report generated')
 
 
 class MockProvider(BaseProvider):
+    provider_name = 'mock'
     def get_initial_request(self):
         return 'Customer-level records and revenue data.'
 
@@ -76,14 +81,15 @@ class MockProvider(BaseProvider):
 
 
 class VultrProvider(BaseProvider):
+    provider_name = 'vultr'
     def __init__(self):
         self.base_url = os.getenv('VULTR_INFERENCE_BASE_URL', '').strip().rstrip('/')
         self.api_key = os.getenv('VULTR_INFERENCE_API_KEY', '').strip()
         self.model = os.getenv('VULTR_MODEL', '').strip()
         if not all((self.base_url, self.api_key, self.model)):
-            raise RuntimeError('Vultr inference requires VULTR_INFERENCE_BASE_URL, VULTR_INFERENCE_API_KEY, and VULTR_MODEL')
+            raise InferenceError('Vultr inference requires VULTR_INFERENCE_BASE_URL, VULTR_INFERENCE_API_KEY, and VULTR_MODEL')
         if not self.base_url.startswith('https://'):
-            raise RuntimeError('VULTR_INFERENCE_BASE_URL must use HTTPS')
+            raise InferenceError('VULTR_INFERENCE_BASE_URL must use HTTPS')
 
     def _complete(self, user_prompt):
         payload = json.dumps({
@@ -92,7 +98,7 @@ class VultrProvider(BaseProvider):
                 {'role': 'system', 'content': 'You are an agent in a secure data-sharing demo. Return one concise plain-text sentence only. Follow the user instruction exactly.'},
                 {'role': 'user', 'content': user_prompt},
             ],
-            'max_tokens': 128,
+            'max_completion_tokens': 1024,
             'temperature': 0,
         }).encode()
         request = Request(
@@ -100,18 +106,20 @@ class VultrProvider(BaseProvider):
             headers={'Authorization': f'Bearer {self.api_key}', 'Content-Type': 'application/json'},
         )
         try:
-            with urlopen(request, timeout=30) as response:
+            with urlopen(request, timeout=60) as response:
                 body = json.load(response)
             content = body['choices'][0]['message']['content']
             if not isinstance(content, str) or not content.strip():
                 raise ValueError('empty completion')
             return content.strip()
         except HTTPError as exc:
-            raise RuntimeError(f'Vultr inference HTTP {exc.code}') from None
+            raise InferenceError(f'Vultr inference HTTP {exc.code}') from None
         except URLError:
-            raise RuntimeError('Vultr inference connection failed') from None
+            raise InferenceError('Vultr inference connection failed') from None
+        except TimeoutError:
+            raise InferenceError('Vultr inference timed out') from None
         except (KeyError, IndexError, TypeError, ValueError):
-            raise RuntimeError('Vultr inference returned an invalid completion') from None
+            raise InferenceError('Vultr inference returned an invalid completion') from None
 
     def get_initial_request(self):
         return self._complete('You are Agent B preparing a revenue report. Make an initial request to Agent A for customer-level records and revenue data. Include the exact phrase customer-level records. This request is expected to be denied by policy.')
@@ -135,4 +143,4 @@ def get_provider():
         return MockProvider()
     if provider_name == 'vultr':
         return VultrProvider()
-    raise RuntimeError('LLM_PROVIDER must be mock or vultr')
+    raise InferenceError('LLM_PROVIDER must be mock or vultr')
