@@ -23,6 +23,16 @@ async def index():
     return FileResponse(str(ROOT / 'templates' / 'index.html'))
 
 
+@app.get('/api/report')
+async def report():
+    report_path = ROOT / 'data' / 'agent_b' / 'report.html'
+    if not report_path.exists():
+        run_demo()
+    if not report_path.exists():
+        return {'error': 'report not generated'}
+    return FileResponse(str(report_path))
+
+
 @app.get('/api/demo')
 async def demo():
     return run_demo()

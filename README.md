@@ -42,7 +42,7 @@ It models a private-data workflow where an agent with restricted access denies a
 
    LLM_PROVIDER=mock python -m uvicorn app:app --host 0.0.0.0 --port 8000
 
-5. Open the browser UI:
+5. Open the browser UI at:
 
    http://localhost:8000
 
@@ -56,7 +56,7 @@ The project is prepared for Vultr integration without requiring credentials for 
 
 - One Vultr Cloud Compute VM hosts the FastAPI app
 - Docker sandboxes run on the same VM for isolated agent execution
-- Vultr Serverless Inference can be enabled later via environment variables
+- Vultr Serverless Inference can be enabled later with environment variables
 - Configuration uses:
 
   LLM_PROVIDER=mock
@@ -64,7 +64,7 @@ The project is prepared for Vultr integration without requiring credentials for 
   VULTR_INFERENCE_API_KEY=
   VULTR_MODEL=
 
-When the endpoint, key, and model are supplied, switching to `LLM_PROVIDER=vultr` activates the same workflow with the Vultr provider interface.
+When the endpoint, key, and model are supplied, setting `LLM_PROVIDER=vultr` activates the same workflow with the Vultr provider interface.
 
 ## Security model
 
